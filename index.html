@@ -54,7 +54,7 @@
       </div>
       <div class="editor-toolbar">
         <button type="button" id="tb-list" class="tool-btn" title="Insertar lista de tareas">☑ Lista</button>
-        <button type="button" id="tb-table" class="tool-btn" title="Insertar tabla">▦ Tabla</button>
+        <button type="button" id="tb-table" class="tool-btn" title="Insertar tabla" aria-expanded="false">▦ Tabla</button>
         <button type="button" id="tb-style" class="tool-btn" aria-expanded="false" title="Estilo de la nota">Aa Estilo</button>
       </div>
       <div id="style-panel" class="style-panel hidden">
@@ -85,7 +85,22 @@
           </select>
         </label>
       </div>
-      <textarea id="note-body" placeholder="Escribe aquí..." class="note-body-input"></textarea>
+      <div id="table-panel" class="style-panel hidden">
+        <label>Filas
+          <select id="tbl-rows">
+            <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+            <option>6</option><option>7</option><option>8</option><option>10</option><option>12</option>
+          </select>
+        </label>
+        <label>Columnas
+          <select id="tbl-cols">
+            <option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option>
+            <option>6</option><option>7</option><option>8</option>
+          </select>
+        </label>
+        <button type="button" id="tbl-insert" class="btn-primary panel-btn">Insertar tabla</button>
+      </div>
+      <div id="note-blocks" class="note-blocks"></div>
       <div class="modal-footer">
         <select id="note-color" class="color-select" aria-label="Color">
           <option value="yellow">Amarillo</option>

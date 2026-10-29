@@ -1,8 +1,7 @@
 import { escapeHTML, highlight, formatDate, formatTime } from '../utils.js';
+import { noteBlocks } from '../blocks.js';
 
 export const CHECK_RE = /^(\s*[-*]\s\[)( |x|X)(\]\s?)(.*)$/;
-const TABLE_RE = /^\s*\|.*\|\s*$/;
-const TABLE_SEP_RE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
 const MAX_PREVIEW_LINES = 12;
 
 export const FONTS = ['sans', 'serif', 'mono', 'hand'];
@@ -21,53 +20,58 @@ export function styleClasses(note) {
   ].filter(Boolean).join(' ');
 }
 
-function splitCells(line) {
-  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
-}
+const MAX_TABLE_ROWS = 8;
 
 function renderTable(rows, query) {
-  const data = rows.filter(r => !TABLE_SEP_RE.test(r)).map(splitCells);
-  if (!data.length) return '';
-  const cols = Math.max(...data.map(r => r.length));
+  if (!rows.length) return '';
+  const shown = rows.slice(0, MAX_TABLE_ROWS);
   const cell = (tag, txt) => `<${tag}>${highlight(txt || '', query)}</${tag}>`;
-  const row = (r, tag) => `<tr>${Array.from({ length: cols }, (_, i) => cell(tag, r[i])).join('')}</tr>`;
-  const [head, ...body] = data;
-  return `<div class="table-wrap"><table class="note-table"><thead>${row(head, 'th')}</thead>` +
-    `<tbody>${body.map(r => row(r, 'td')).join('')}</tbody></table></div>`;
+  const [head, ...body] = shown;
+  let html = `<div class="table-wrap"><table class="note-table">` +
+    `<thead><tr>${head.map(c => cell('th', c)).join('')}</tr></thead>` +
+    `<tbody>${body.map(r => `<tr>${r.map(c => cell('td', c)).join('')}</tr>`).join('')}</tbody></table></div>`;
+  if (rows.length > MAX_TABLE_ROWS) html += `<div class="line more">… ${rows.length - MAX_TABLE_ROWS} filas más</div>`;
+  return html;
 }
 
-function renderBody(body, query) {
-  if (!body) return '';
-  const lines = body.split('\n');
-  const limit = Math.min(lines.length, MAX_PREVIEW_LINES);
+function renderText(block, blockIdx, query, budget) {
+  const lines = block.text.split('\n');
   let html = '';
-  let i = 0;
-
-  while (i < limit) {
-    const line = lines[i];
-
-    // Tabla: líneas seguidas que empiezan y terminan con |
-    if (TABLE_RE.test(line)) {
-      const rows = [];
-      while (i < lines.length && TABLE_RE.test(lines[i]) && rows.length < 10) rows.push(lines[i++]);
-      html += renderTable(rows, query);
-      continue;
-    }
-
-    // Casilla de lista; data-line guarda el número real de línea
-    const m = line.match(CHECK_RE);
+  let used = 0;
+  for (let i = 0; i < lines.length && used < budget; i++, used++) {
+    const m = lines[i].match(CHECK_RE);
     if (m) {
       const done = m[2].toLowerCase() === 'x';
       html += `<label class="line check-line${done ? ' done' : ''}">` +
-        `<input type="checkbox" class="check-toggle" data-line="${i}"${done ? ' checked' : ''}>` +
+        `<input type="checkbox" class="check-toggle" data-block="${blockIdx}" data-line="${i}"${done ? ' checked' : ''}>` +
         `<span>${highlight(m[4], query)}</span></label>`;
     } else {
-      html += `<div class="line">${highlight(line, query)}</div>`;
+      html += `<div class="line">${highlight(lines[i], query)}</div>`;
     }
-    i++;
   }
+  return { html, used, truncated: used < lines.length };
+}
 
-  if (i < lines.length) html += '<div class="line">…</div>';
+function renderBody(note, query) {
+  const blocks = noteBlocks(note);
+  let budget = MAX_PREVIEW_LINES;
+  let html = '';
+  for (let b = 0; b < blocks.length; b++) {
+    const block = blocks[b];
+    if (block.type === 'table') {
+      html += renderTable(block.rows, query);
+      budget -= 2;
+      continue;
+    }
+    // Saltar renglones vacíos sobrantes al final de un bloque
+    const trimmed = { ...block, text: block.text.replace(/\n+$/, '') };
+    if (!trimmed.text) continue;
+    if (budget <= 0) { html += '<div class="line">…</div>'; break; }
+    const r = renderText(trimmed, b, query, budget);
+    html += r.html;
+    budget -= r.used;
+    if (r.truncated) { html += '<div class="line">…</div>'; break; }
+  }
   return html;
 }
 
@@ -80,7 +84,7 @@ export function renderNoteCard(note, query = '') {
     <div class="note-card paper-${color}" data-note-id="${id}" tabindex="0">
       <button class="delete-btn" data-delete-note="${id}" aria-label="Eliminar nota">✕</button>
       <h3 class="${fontClass}">${note.pinned ? '<span class="pin-badge">📌</span>' : ''}${highlight(note.title || 'Sin título', query)}</h3>
-      <div class="note-preview ${style}">${renderBody(note.body, query)}</div>
+      <div class="note-preview ${style}">${renderBody(note, query)}</div>
       <div class="note-meta">${formatDate(note.updatedAt)} · ${formatTime(note.updatedAt)}</div>
     </div>
   `;

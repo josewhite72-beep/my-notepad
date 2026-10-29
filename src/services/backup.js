@@ -1,3 +1,5 @@
+import { sanitizeBlocks, blocksToBody } from '../blocks.js';
+
 const FORMAT = 'cuaderno-backup';
 const VERSION = 1;
 
@@ -44,7 +46,10 @@ export async function readBackup(file) {
   const notes = (Array.isArray(data.notes) ? data.notes : []).filter(isValidNote).map(n => ({
     id: n.id,
     title: String(n.title || ''),
-    body: String(n.body || ''),
+    ...(() => {
+      const blocks = sanitizeBlocks(n.blocks);
+      return blocks ? { blocks, body: blocksToBody(blocks) } : { body: String(n.body || '') };
+    })(),
     color: n.color || 'yellow',
     font: n.font || 'sans',
     size: n.size || 'm',

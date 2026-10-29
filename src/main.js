@@ -8,6 +8,8 @@ import { CHECK_RE, styleClasses } from './views/cards.js';
 import { setupReminders, requestNotificationPermission, notificationsSupported } from './services/reminders.js';
 import { exportData, readBackup } from './services/backup.js';
 import { debounce, escapeHTML, toTimestamp, toInputValues } from './utils.js';
+import { noteBlocks, blocksToBody, blocksEmpty } from './blocks.js';
+import { initEditor, loadBlocks, readBlocks, insertTable, insertList, focusStart, refreshSizes } from './editor.js';
 
 // ============ PWA ============
 if ('serviceWorker' in navigator) {
@@ -114,9 +116,11 @@ window.addEventListener('popstate', () => {
 let saveChain = Promise.resolve();
 
 function readNoteForm() {
+  const blocks = readBlocks();
   return {
     title: $('note-title').value.trim(),
-    body: $('note-body').value.replace(/\s+$/, ''),
+    blocks,
+    body: blocksToBody(blocks),
     color: $('note-color').value,
     font: $('note-font').value,
     size: $('note-size').value,
@@ -126,15 +130,16 @@ function readNoteForm() {
 
 function persistNote() {
   saveChain = saveChain.then(async () => {
-    const { title, body, color, font, size, ink } = readNoteForm();
+    const { title, blocks, body, color, font, size, ink } = readNoteForm();
     const base = state.editingNote;
-    if (!base && !title && !body) return; // nota nueva vacía: no guardar
+    if (!base && !title && blocksEmpty(blocks)) return; // nota nueva vacía: no guardar
 
     const now = Date.now();
     const note = {
       ...(base || {}),
       id: base?.id || uuid(),
       title,
+      blocks,
       body,
       color,
       font,
@@ -174,104 +179,37 @@ function setPinButton() {
 // ============ BARRA DEL EDITOR ============
 function applyEditorStyle() {
   const look = { font: $('note-font').value, size: $('note-size').value, ink: $('note-ink').value };
-  $('note-body').className = `note-body-input ${styleClasses(look)}`;
+  $('note-blocks').className = `note-blocks ${styleClasses(look)}`;
   $('note-title').className = `note-title-input${look.font !== 'sans' ? ' font-' + look.font : ''}`;
+  refreshSizes();
 }
 
-function toggleStylePanel(force) {
-  const open = force ?? $('style-panel').classList.contains('hidden');
-  $('style-panel').classList.toggle('hidden', !open);
-  $('tb-style').setAttribute('aria-expanded', String(open));
-}
-
-function lineBounds(value, pos) {
-  const start = value.lastIndexOf('\n', pos - 1) + 1;
-  const nl = value.indexOf('\n', pos);
-  return { start, end: nl === -1 ? value.length : nl };
-}
-
-function insertList() {
-  const ta = $('note-body');
-  const v = ta.value;
-  const s = ta.selectionStart;
-  const e = ta.selectionEnd;
-  const { start, end } = lineBounds(v, s);
-
-  if (s !== e) {
-    // Varias líneas seleccionadas: convertir cada una en tarea
-    const blockEnd = lineBounds(v, e).end;
-    const block = v.slice(start, blockEnd).split('\n')
-      .map(l => (CHECK_RE.test(l) || !l.trim()) ? l : '- [ ] ' + l).join('\n');
-    ta.setRangeText(block, start, blockEnd, 'end');
-  } else {
-    const line = v.slice(start, end);
-    if (!line.trim()) {
-      ta.setRangeText('- [ ] ', start, end, 'end');
-    } else {
-      // Línea con texto: la tarea nueva va en la línea siguiente
-      ta.setRangeText('\n- [ ] ', end, end, 'end');
-    }
-  }
-  ta.focus();
-  onNoteInput();
-}
-
-function insertTable() {
-  const ta = $('note-body');
-  const v = ta.value;
-  const s = ta.selectionEnd;
-  const { start, end } = lineBounds(v, s);
-  const lineHasText = v.slice(start, end).trim() !== '';
-  const insertAt = lineHasText ? end : start;
-  const before = lineHasText ? '\n' : '';
-  const after = insertAt < v.length ? '' : '\n';
-  const table = '| Columna 1 | Columna 2 |\n|  |  |\n|  |  |';
-  ta.setRangeText(before + table + after, insertAt, lineHasText ? end : end, 'end');
-  // Dejar seleccionado «Columna 1» para escribir encima
-  const pos = insertAt + before.length + 2;
-  ta.focus();
-  ta.setSelectionRange(pos, pos + 'Columna 1'.length);
-  onNoteInput();
-}
-
-// Enter dentro de una tarea crea la siguiente; Enter en una tarea vacía termina la lista
-function handleEditorEnter(e) {
-  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-  const ta = e.target;
-  if (ta.selectionStart !== ta.selectionEnd) return;
-  const s = ta.selectionStart;
-  const { start, end } = lineBounds(ta.value, s);
-  if (s !== end) return;
-  const m = ta.value.slice(start, end).match(CHECK_RE);
-  if (!m) return;
-  e.preventDefault();
-  if (!m[4].trim()) {
-    ta.setRangeText('', start, end, 'end');
-  } else {
-    ta.setRangeText('\n- [ ] ', s, s, 'end');
-  }
-  onNoteInput();
+function togglePanel(panelId, btnId, force) {
+  const open = force ?? $(panelId).classList.contains('hidden');
+  $(panelId).classList.toggle('hidden', !open);
+  $(btnId).setAttribute('aria-expanded', String(open));
 }
 
 function openNoteModal(note = null) {
   state.editingNote = note ? { ...note } : null;
   state.draftPinned = !!note?.pinned;
   $('note-title').value = note?.title || '';
-  $('note-body').value = note?.body || '';
   $('note-color').value = note?.color || 'yellow';
   $('note-font').value = note?.font || 'sans';
   $('note-size').value = note?.size || 'm';
   $('note-ink').value = note?.ink || 'default';
-  applyEditorStyle();
-  toggleStylePanel(false);
+  togglePanel('style-panel', 'tb-style', false);
+  togglePanel('table-panel', 'tb-table', false);
   $('note-modal').className = `modal paper-${note?.color || 'yellow'}`;
   $('note-status').textContent = '';
   $('note-delete').hidden = !note;
   setPinButton();
   closeMenu();
   $('note-overlay').classList.remove('hidden');
+  loadBlocks(noteBlocks(note));
+  applyEditorStyle();
   pushModalState();
-  (note ? $('note-body') : $('note-title')).focus();
+  if (note) focusStart(); else $('note-title').focus();
 }
 
 async function closeNoteModal({ fromHistory = false } = {}) {
@@ -292,14 +230,18 @@ async function deleteNoteById(id) {
   return true;
 }
 
-async function toggleChecklistLine(noteId, lineIndex) {
+async function toggleChecklistLine(noteId, blockIdx, lineIndex) {
   const note = state.notes.find(n => n.id === noteId);
   if (!note) return;
-  const lines = note.body.split('\n');
+  const blocks = noteBlocks(note);
+  const block = blocks[blockIdx];
+  if (block?.type !== 'text') return;
+  const lines = block.text.split('\n');
   const m = lines[lineIndex]?.match(CHECK_RE);
   if (!m) return;
   lines[lineIndex] = m[1] + (m[2] === ' ' ? 'x' : ' ') + m[3] + m[4];
-  const updated = { ...note, body: lines.join('\n'), updatedAt: Date.now() };
+  block.text = lines.join('\n');
+  const updated = { ...note, blocks, body: blocksToBody(blocks), updatedAt: Date.now() };
   await saveNote(updated);
   upsert(state.notes, updated);
   state.notes.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -508,7 +450,7 @@ function setupEventListeners() {
     const box = e.target.closest('.check-toggle');
     if (!box) return;
     const card = box.closest('[data-note-id]');
-    toggleChecklistLine(card.dataset.noteId, Number(box.dataset.line));
+    toggleChecklistLine(card.dataset.noteId, Number(box.dataset.block), Number(box.dataset.line));
   });
 
   container.addEventListener('click', async e => {
@@ -544,20 +486,29 @@ function setupEventListeners() {
 
   // Modal de nota
   $('note-title').addEventListener('input', onNoteInput);
-  $('note-body').addEventListener('input', onNoteInput);
   $('note-color').addEventListener('change', () => {
     $('note-modal').className = `modal paper-${$('note-color').value}`;
     onNoteInput();
   });
   // Barra del editor (mousedown evita que el teclado del teléfono se cierre)
-  ['tb-list', 'tb-table', 'tb-style'].forEach(id =>
+  ['tb-list', 'tb-table', 'tb-style', 'tbl-insert'].forEach(id =>
     $(id).addEventListener('mousedown', e => e.preventDefault()));
   $('tb-list').addEventListener('click', insertList);
-  $('tb-table').addEventListener('click', insertTable);
-  $('tb-style').addEventListener('click', () => toggleStylePanel());
+  $('tb-table').addEventListener('click', () => {
+    togglePanel('table-panel', 'tb-table');
+    togglePanel('style-panel', 'tb-style', false);
+  });
+  $('tbl-insert').addEventListener('click', () => {
+    togglePanel('table-panel', 'tb-table', false);
+    insertTable(Number($('tbl-rows').value), Number($('tbl-cols').value));
+  });
+  $('tb-style').addEventListener('click', () => {
+    togglePanel('style-panel', 'tb-style');
+    togglePanel('table-panel', 'tb-table', false);
+  });
   ['note-font', 'note-size', 'note-ink'].forEach(id =>
     $(id).addEventListener('change', () => { applyEditorStyle(); onNoteInput(); }));
-  $('note-body').addEventListener('keydown', handleEditorEnter);
+  initEditor($('note-blocks'), onNoteInput);
 
   $('note-pin').addEventListener('click', () => {
     state.draftPinned = !state.draftPinned;
