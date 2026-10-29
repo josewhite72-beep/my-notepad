@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#4a90e2">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta name="description" content="Notas, agenda y recordatorios sin conexión">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles/app.css">
+  <title>Cuaderno</title>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-row">
+      <h1>Cuaderno</h1>
+      <div class="header-actions">
+        <button id="btn-new-note" class="btn-primary">+ Nota</button>
+        <button id="btn-new-event" class="btn-secondary">+ Evento</button>
+        <button id="btn-menu" class="btn-icon" aria-label="Más opciones" aria-haspopup="true">⋮</button>
+      </div>
+    </div>
+
+    <div id="menu" class="menu hidden" role="menu">
+      <button data-action="notify" role="menuitem">🔔 Activar recordatorios</button>
+      <button data-action="export" role="menuitem">⬇️ Exportar copia (JSON)</button>
+      <button data-action="import" role="menuitem">⬆️ Importar copia (JSON)</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json,.json" hidden>
+
+    <nav class="nav-tabs">
+      <button data-view="hoy" class="tab active">Hoy</button>
+      <button data-view="notas" class="tab">Notas</button>
+      <button data-view="agenda" class="tab">Agenda</button>
+    </nav>
+
+    <input type="search" id="search" class="search-input" placeholder="Buscar notas y eventos…" autocomplete="off">
+  </header>
+
+  <main id="app-container">
+    <div id="view-hoy" class="view"></div>
+    <div id="view-notas" class="view hidden"></div>
+    <div id="view-agenda" class="view hidden"></div>
+  </main>
+
+  <!-- Modal de nota -->
+  <div id="note-overlay" class="modal-overlay hidden">
+    <div class="modal" id="note-modal">
+      <div class="modal-header">
+        <input type="text" id="note-title" placeholder="Título..." class="note-title-input">
+        <button id="note-close" class="btn-icon" aria-label="Cerrar">✕</button>
+      </div>
+      <textarea id="note-body" placeholder="Escribe aquí...&#10;Para una lista de tareas escribe:  - [ ] tarea" class="note-body-input"></textarea>
+      <div class="modal-footer">
+        <select id="note-color" class="color-select" aria-label="Color">
+          <option value="yellow">Amarillo</option>
+          <option value="blue">Azul</option>
+          <option value="green">Verde</option>
+          <option value="pink">Rosa</option>
+          <option value="white">Blanco</option>
+        </select>
+        <button id="note-pin" class="btn-secondary" aria-pressed="false">📌 Fijar</button>
+        <button id="note-delete" class="btn-danger">Eliminar</button>
+        <span id="note-status" class="save-status"></span>
+        <button id="note-done" class="btn-primary">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de evento -->
+  <div id="event-overlay" class="modal-overlay hidden">
+    <form class="modal" id="event-form" novalidate>
+      <div class="modal-header">
+        <input type="text" id="event-title" placeholder="Título del evento..." class="note-title-input" required>
+        <button type="button" id="event-close" class="btn-icon" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="form-body">
+        <div class="form-row">
+          <label>Fecha <input type="date" id="event-date" required></label>
+          <label>Hora <input type="time" id="event-time" required></label>
+        </div>
+        <label>Recordatorio
+          <select id="event-reminder">
+            <option value="">Sin recordatorio</option>
+            <option value="0">A la hora del evento</option>
+            <option value="5">5 minutos antes</option>
+            <option value="15">15 minutos antes</option>
+            <option value="30">30 minutos antes</option>
+            <option value="60">1 hora antes</option>
+            <option value="1440">1 día antes</option>
+          </select>
+        </label>
+        <label>Detalle
+          <textarea id="event-detail" rows="3" placeholder="Lugar, notas…"></textarea>
+        </label>
+        <p id="event-error" class="form-error"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="event-delete" class="btn-danger">Eliminar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

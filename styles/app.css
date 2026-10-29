@@ -1,0 +1,357 @@
+:root {
+  --primary: #4a90e2;
+  --primary-dark: #2f6fba;
+  --danger: #d9534f;
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --text: #333;
+  --muted: #777;
+  --border: #ddd;
+  --shadow: rgba(0,0,0,0.1);
+
+  --paper-yellow: #fff9c4;
+  --paper-blue: #bbdefb;
+  --paper-green: #c8e6c9;
+  --paper-pink: #f8bbd0;
+  --paper-white: #ffffff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ---------- Encabezado ---------- */
+.app-header {
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 4px var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.app-header h1 { font-size: 1.4rem; }
+
+.header-actions { display: flex; gap: 0.4rem; align-items: center; }
+
+.nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+
+.tab {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: var(--bg);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tab.active { background: var(--primary); color: white; }
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+/* ---------- Menú ---------- */
+.menu {
+  position: absolute;
+  right: 1rem;
+  top: 3.25rem;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 200;
+}
+
+.menu.hidden { display: none; }
+
+.menu button {
+  border: none;
+  background: none;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover, .menu button:focus-visible { background: var(--bg); }
+
+/* ---------- Botones ---------- */
+.btn-primary, .btn-secondary, .btn-danger {
+  border: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:active { background: var(--primary-dark); }
+.btn-secondary { background: var(--bg); border: 1px solid var(--border); }
+.btn-secondary[aria-pressed="true"] { background: #ffe082; border-color: #f0c040; }
+.btn-danger { background: none; color: var(--danger); border: 1px solid var(--danger); }
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+}
+
+/* ---------- Contenido ---------- */
+#app-container {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.view { animation: fadeIn 0.25s; }
+.view.hidden { display: none; }
+.view h2 { margin-bottom: 0.75rem; font-size: 1.25rem; }
+.view h3 { margin: 1.25rem 0 0.5rem; font-size: 1rem; color: var(--muted); }
+.view h2.section-gap { margin-top: 2rem; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* ---------- Tarjetas de nota ---------- */
+.note-card {
+  padding: 1rem;
+  padding-right: 2.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  cursor: pointer;
+  transition: transform 0.2s;
+  position: relative;
+  min-height: 5rem;
+}
+
+.note-card:hover { transform: translateY(-2px); }
+
+.note-card.paper-yellow { background: var(--paper-yellow); }
+.note-card.paper-blue { background: var(--paper-blue); }
+.note-card.paper-green { background: var(--paper-green); }
+.note-card.paper-pink { background: var(--paper-pink); }
+.note-card.paper-white { background: var(--paper-white); }
+
+.note-card h3 { font-size: 1.05rem; margin: 0 0 0.4rem; color: var(--text); }
+
+.note-card .pin-badge { margin-right: 0.25rem; }
+
+.note-preview {
+  font-size: 0.9rem;
+  color: #555;
+  max-height: 9.5em;
+  overflow: hidden;
+}
+
+.note-preview .line { min-height: 1.4em; overflow-wrap: anywhere; }
+
+.check-line { display: flex; gap: 0.4rem; align-items: flex-start; }
+.check-line input { margin-top: 0.3em; width: 1.05rem; height: 1.05rem; flex-shrink: 0; cursor: pointer; }
+.check-line.done span { text-decoration: line-through; color: #999; }
+
+.note-meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+
+.note-card .delete-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: rgba(255,255,255,0.75);
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.note-card:hover .delete-btn,
+.note-card:focus-within .delete-btn { opacity: 1; }
+
+/* En pantallas táctiles no existe hover: el botón siempre visible */
+@media (hover: none) {
+  .note-card .delete-btn { opacity: 1; }
+}
+
+mark { background: #ffeb3b; padding: 0 1px; border-radius: 2px; }
+
+/* ---------- Modales ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-overlay.hidden { display: none; }
+
+/* El modal de nota toma el color del papel elegido */
+.modal.paper-yellow { background: var(--paper-yellow); }
+.modal.paper-blue { background: var(--paper-blue); }
+.modal.paper-green { background: var(--paper-green); }
+.modal.paper-pink { background: var(--paper-pink); }
+.modal.paper-white { background: var(--paper-white); }
+
+.modal {
+  background: var(--surface);
+  border-radius: 10px;
+  width: 92%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.note-title-input {
+  flex: 1;
+  border: none;
+  font-size: 1.2rem;
+  font-weight: bold;
+  outline: none;
+  background: transparent;
+  min-width: 0;
+}
+
+.note-body-input {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  resize: none;
+  font-size: 1rem;
+  outline: none;
+  min-height: 280px;
+  background: transparent;
+}
+
+.modal-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.modal-footer .btn-primary { margin-left: auto; }
+
+.save-status { font-size: 0.8rem; color: var(--muted); }
+
+.color-select, .form-body select, .form-body input, .form-body textarea {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.form-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.form-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  flex: 1;
+}
+
+.form-body textarea { resize: vertical; }
+
+.form-row { display: flex; gap: 0.75rem; }
+
+.form-error { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; }
+
+/* ---------- Estado vacío y agenda ---------- */
+.empty-state { text-align: center; padding: 3rem 1rem; color: #999; }
+.empty-hint { color: #999; padding: 0.5rem 0; }
+
+.agenda-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.agenda-item {
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow);
+  cursor: pointer;
+  border-left: 4px solid var(--primary);
+}
+
+.agenda-item.past { opacity: 0.6; border-left-color: #bbb; }
+
+.agenda-item .time { font-weight: bold; color: var(--primary); font-size: 0.9rem; }
+.agenda-item .title { font-weight: 500; }
+.agenda-item .detail { color: #666; font-size: 0.9rem; overflow-wrap: anywhere; }
+.agenda-item .bell { font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- Aviso flotante ---------- */
+.toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  z-index: 2000;
+  max-width: 90%;
+  text-align: center;
+}
+
+.toast.hidden { display: none; }
+
+@media (max-width: 600px) {
+  .notes-grid { grid-template-columns: 1fr; }
+  .modal { width: 96%; max-height: 94vh; }
+  .app-header h1 { font-size: 1.2rem; }
+  .btn-primary, .btn-secondary { padding: 0.45rem 0.7rem; }
+}
