@@ -16,6 +16,13 @@
   --paper-white: #ffffff;
 }
 
+@font-face {
+  font-family: 'Caveat';
+  src: url('../fonts/caveat.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -279,6 +286,99 @@ mark { background: #ffeb3b; padding: 0 1px; border-radius: 2px; }
 .modal-footer .btn-primary { margin-left: auto; }
 
 .save-status { font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- Barra del editor ---------- */
+.editor-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.tool-btn {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.7);
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tool-btn[aria-expanded="true"] { background: #fff; border-color: var(--primary); }
+
+.style-panel {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.style-panel.hidden { display: none; }
+
+.style-panel label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--muted);
+  flex: 1;
+  min-width: 6.5rem;
+}
+
+.style-panel select {
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+/* ---------- Estilo por nota (tarjeta y editor) ---------- */
+.font-serif { font-family: Georgia, 'Times New Roman', serif; }
+.font-mono  { font-family: 'Courier New', Courier, monospace; }
+.font-hand  { font-family: 'Caveat', 'Segoe Print', cursive; }
+
+.note-body-input.size-s, .note-preview.size-s { font-size: 0.85rem; }
+.note-body-input.size-m { font-size: 1rem; }
+.note-body-input.size-l, .note-preview.size-l { font-size: 1.15rem; }
+.note-body-input.size-xl, .note-preview.size-xl { font-size: 1.35rem; }
+/* La letra manuscrita es más pequeña a la vista: se compensa */
+.note-body-input.font-hand, .note-preview.font-hand { font-size: 1.3em; }
+.note-body-input.font-hand.size-l, .note-preview.font-hand.size-l { font-size: 1.5rem; }
+.note-body-input.font-hand.size-xl, .note-preview.font-hand.size-xl { font-size: 1.75rem; }
+.note-body-input.font-hand.size-s, .note-preview.font-hand.size-s { font-size: 1.1rem; }
+
+.ink-blue   { color: #1a4fa0 !important; }
+.ink-red    { color: #b3261e !important; }
+.ink-green  { color: #2e7d32 !important; }
+.ink-purple { color: #6a1b9a !important; }
+.ink-brown  { color: #6d4c41 !important; }
+
+.note-card h3.font-hand { font-size: 1.4rem; }
+
+/* ---------- Tablas en notas: bordes negros, fondo blanco ---------- */
+.table-wrap { overflow-x: auto; margin: 0.25rem 0; }
+
+.note-table {
+  border-collapse: collapse;
+  background: #fff;
+  font-size: inherit;
+  min-width: 100%;
+}
+
+.note-table th, .note-table td {
+  border: 1px solid #000;
+  padding: 0.2rem 0.45rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.note-table th { font-weight: bold; }
+
+/* Celdas vacías con altura normal para que se vean como renglón */
+.note-table td:empty::after, .note-table th:empty::after { content: "\00a0"; }
 
 .color-select, .form-body select, .form-body input, .form-body textarea {
   padding: 0.5rem;

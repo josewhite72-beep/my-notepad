@@ -52,7 +52,40 @@
         <input type="text" id="note-title" placeholder="Título..." class="note-title-input">
         <button id="note-close" class="btn-icon" aria-label="Cerrar">✕</button>
       </div>
-      <textarea id="note-body" placeholder="Escribe aquí...&#10;Para una lista de tareas escribe:  - [ ] tarea" class="note-body-input"></textarea>
+      <div class="editor-toolbar">
+        <button type="button" id="tb-list" class="tool-btn" title="Insertar lista de tareas">☑ Lista</button>
+        <button type="button" id="tb-table" class="tool-btn" title="Insertar tabla">▦ Tabla</button>
+        <button type="button" id="tb-style" class="tool-btn" aria-expanded="false" title="Estilo de la nota">Aa Estilo</button>
+      </div>
+      <div id="style-panel" class="style-panel hidden">
+        <label>Letra
+          <select id="note-font">
+            <option value="sans">Normal</option>
+            <option value="serif">Serif</option>
+            <option value="mono">Máquina</option>
+            <option value="hand">Manuscrita</option>
+          </select>
+        </label>
+        <label>Tamaño
+          <select id="note-size">
+            <option value="s">Pequeño</option>
+            <option value="m">Normal</option>
+            <option value="l">Grande</option>
+            <option value="xl">Muy grande</option>
+          </select>
+        </label>
+        <label>Color
+          <select id="note-ink">
+            <option value="default">Negro</option>
+            <option value="blue">Azul</option>
+            <option value="red">Rojo</option>
+            <option value="green">Verde</option>
+            <option value="purple">Morado</option>
+            <option value="brown">Café</option>
+          </select>
+        </label>
+      </div>
+      <textarea id="note-body" placeholder="Escribe aquí..." class="note-body-input"></textarea>
       <div class="modal-footer">
         <select id="note-color" class="color-select" aria-label="Color">
           <option value="yellow">Amarillo</option>

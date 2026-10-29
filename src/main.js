@@ -4,7 +4,7 @@ import { getEvents, saveEvent, deleteEvent } from './db/events.js';
 import { renderHoy } from './views/hoy.js';
 import { renderNotas } from './views/notas.js';
 import { renderAgenda } from './views/agenda.js';
-import { CHECK_RE } from './views/cards.js';
+import { CHECK_RE, styleClasses } from './views/cards.js';
 import { setupReminders, requestNotificationPermission, notificationsSupported } from './services/reminders.js';
 import { exportData, readBackup } from './services/backup.js';
 import { debounce, escapeHTML, toTimestamp, toInputValues } from './utils.js';
@@ -117,13 +117,16 @@ function readNoteForm() {
   return {
     title: $('note-title').value.trim(),
     body: $('note-body').value.replace(/\s+$/, ''),
-    color: $('note-color').value
+    color: $('note-color').value,
+    font: $('note-font').value,
+    size: $('note-size').value,
+    ink: $('note-ink').value
   };
 }
 
 function persistNote() {
   saveChain = saveChain.then(async () => {
-    const { title, body, color } = readNoteForm();
+    const { title, body, color, font, size, ink } = readNoteForm();
     const base = state.editingNote;
     if (!base && !title && !body) return; // nota nueva vacía: no guardar
 
@@ -134,6 +137,9 @@ function persistNote() {
       title,
       body,
       color,
+      font,
+      size,
+      ink,
       pinned: state.draftPinned,
       tags: base?.tags || [],
       createdAt: base?.createdAt || now,
@@ -165,12 +171,99 @@ function setPinButton() {
   btn.textContent = state.draftPinned ? '📌 Fijada' : '📌 Fijar';
 }
 
+// ============ BARRA DEL EDITOR ============
+function applyEditorStyle() {
+  const look = { font: $('note-font').value, size: $('note-size').value, ink: $('note-ink').value };
+  $('note-body').className = `note-body-input ${styleClasses(look)}`;
+  $('note-title').className = `note-title-input${look.font !== 'sans' ? ' font-' + look.font : ''}`;
+}
+
+function toggleStylePanel(force) {
+  const open = force ?? $('style-panel').classList.contains('hidden');
+  $('style-panel').classList.toggle('hidden', !open);
+  $('tb-style').setAttribute('aria-expanded', String(open));
+}
+
+function lineBounds(value, pos) {
+  const start = value.lastIndexOf('\n', pos - 1) + 1;
+  const nl = value.indexOf('\n', pos);
+  return { start, end: nl === -1 ? value.length : nl };
+}
+
+function insertList() {
+  const ta = $('note-body');
+  const v = ta.value;
+  const s = ta.selectionStart;
+  const e = ta.selectionEnd;
+  const { start, end } = lineBounds(v, s);
+
+  if (s !== e) {
+    // Varias líneas seleccionadas: convertir cada una en tarea
+    const blockEnd = lineBounds(v, e).end;
+    const block = v.slice(start, blockEnd).split('\n')
+      .map(l => (CHECK_RE.test(l) || !l.trim()) ? l : '- [ ] ' + l).join('\n');
+    ta.setRangeText(block, start, blockEnd, 'end');
+  } else {
+    const line = v.slice(start, end);
+    if (!line.trim()) {
+      ta.setRangeText('- [ ] ', start, end, 'end');
+    } else {
+      // Línea con texto: la tarea nueva va en la línea siguiente
+      ta.setRangeText('\n- [ ] ', end, end, 'end');
+    }
+  }
+  ta.focus();
+  onNoteInput();
+}
+
+function insertTable() {
+  const ta = $('note-body');
+  const v = ta.value;
+  const s = ta.selectionEnd;
+  const { start, end } = lineBounds(v, s);
+  const lineHasText = v.slice(start, end).trim() !== '';
+  const insertAt = lineHasText ? end : start;
+  const before = lineHasText ? '\n' : '';
+  const after = insertAt < v.length ? '' : '\n';
+  const table = '| Columna 1 | Columna 2 |\n|  |  |\n|  |  |';
+  ta.setRangeText(before + table + after, insertAt, lineHasText ? end : end, 'end');
+  // Dejar seleccionado «Columna 1» para escribir encima
+  const pos = insertAt + before.length + 2;
+  ta.focus();
+  ta.setSelectionRange(pos, pos + 'Columna 1'.length);
+  onNoteInput();
+}
+
+// Enter dentro de una tarea crea la siguiente; Enter en una tarea vacía termina la lista
+function handleEditorEnter(e) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  const ta = e.target;
+  if (ta.selectionStart !== ta.selectionEnd) return;
+  const s = ta.selectionStart;
+  const { start, end } = lineBounds(ta.value, s);
+  if (s !== end) return;
+  const m = ta.value.slice(start, end).match(CHECK_RE);
+  if (!m) return;
+  e.preventDefault();
+  if (!m[4].trim()) {
+    ta.setRangeText('', start, end, 'end');
+  } else {
+    ta.setRangeText('\n- [ ] ', s, s, 'end');
+  }
+  onNoteInput();
+}
+
 function openNoteModal(note = null) {
   state.editingNote = note ? { ...note } : null;
   state.draftPinned = !!note?.pinned;
   $('note-title').value = note?.title || '';
   $('note-body').value = note?.body || '';
   $('note-color').value = note?.color || 'yellow';
+  $('note-font').value = note?.font || 'sans';
+  $('note-size').value = note?.size || 'm';
+  $('note-ink').value = note?.ink || 'default';
+  applyEditorStyle();
+  toggleStylePanel(false);
   $('note-modal').className = `modal paper-${note?.color || 'yellow'}`;
   $('note-status').textContent = '';
   $('note-delete').hidden = !note;
@@ -456,6 +549,16 @@ function setupEventListeners() {
     $('note-modal').className = `modal paper-${$('note-color').value}`;
     onNoteInput();
   });
+  // Barra del editor (mousedown evita que el teclado del teléfono se cierre)
+  ['tb-list', 'tb-table', 'tb-style'].forEach(id =>
+    $(id).addEventListener('mousedown', e => e.preventDefault()));
+  $('tb-list').addEventListener('click', insertList);
+  $('tb-table').addEventListener('click', insertTable);
+  $('tb-style').addEventListener('click', () => toggleStylePanel());
+  ['note-font', 'note-size', 'note-ink'].forEach(id =>
+    $(id).addEventListener('change', () => { applyEditorStyle(); onNoteInput(); }));
+  $('note-body').addEventListener('keydown', handleEditorEnter);
+
   $('note-pin').addEventListener('click', () => {
     state.draftPinned = !state.draftPinned;
     setPinButton();

@@ -1,5 +1,5 @@
 // Subir este número en cada despliegue para forzar la actualización del caché
-const CACHE_NAME = 'cuaderno-v2';
+const CACHE_NAME = 'cuaderno-v3';
 
 const SHELL = [
   './',
@@ -8,6 +8,7 @@ const SHELL = [
   './icon-192.png',
   './icon-512.png',
   './styles/app.css',
+  './fonts/caveat.woff2',
   './src/main.js',
   './src/utils.js',
   './src/db/database.js',
