@@ -9,6 +9,12 @@ export function textBlock(text = '') {
   return { id: blockId(), type: 'text', text };
 }
 
+export function imageBlock(src) {
+  return { id: blockId(), type: 'image', src };
+}
+
+export const isImageSrc = src => typeof src === 'string' && /^data:image\/(jpeg|png|webp|gif);base64,/.test(src);
+
 export function tableBlock(rows = 3, cols = 3) {
   return {
     id: blockId(),
@@ -64,6 +70,8 @@ export function sanitizeBlocks(blocks) {
   for (const b of blocks) {
     if (b?.type === 'text') {
       clean.push({ id: String(b.id || blockId()), type: 'text', text: String(b.text ?? '') });
+    } else if (b?.type === 'image' && isImageSrc(b.src)) {
+      clean.push({ id: String(b.id || blockId()), type: 'image', src: b.src });
     } else if (b?.type === 'table' && Array.isArray(b.rows) && b.rows.length) {
       const rows = b.rows.filter(Array.isArray);
       if (rows.length) clean.push({ id: String(b.id || blockId()), type: 'table', rows: squareRows(rows) });
@@ -96,7 +104,7 @@ export function noteBlocks(note) {
 
 // Texto plano equivalente: sirve para buscar y como respaldo legible
 export function blocksToBody(blocks) {
-  return blocks.map(b => b.type === 'text'
+  return blocks.filter(b => b.type !== 'image').map(b => b.type === 'text'
     ? b.text
     : b.rows.map(r => `| ${r.join(' | ')} |`).join('\n')
   ).join('\n').replace(/\s+$/, '');
@@ -105,3 +113,12 @@ export function blocksToBody(blocks) {
 export function blocksEmpty(blocks) {
   return blocks.every(b => b.type === 'text' ? !b.text.trim() : false);
 }
+
+// ---------- Categorías ----------
+export const CATEGORIES = {
+  receta: { icon: '🍲', label: 'Receta', plural: 'Recetas' },
+  pelicula: { icon: '🎬', label: 'Película', plural: 'Películas' },
+  otro: { icon: '📌', label: 'Otro', plural: 'Otros' }
+};
+
+export const validCategory = c => (typeof c === 'string' && Object.hasOwn(CATEGORIES, c) ? c : '');

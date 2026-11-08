@@ -1,4 +1,4 @@
-import { sanitizeBlocks, blocksToBody } from '../blocks.js';
+import { sanitizeBlocks, blocksToBody, validCategory } from '../blocks.js';
 
 const FORMAT = 'cuaderno-backup';
 const VERSION = 1;
@@ -51,6 +51,8 @@ export async function readBackup(file) {
       return blocks ? { blocks, body: blocksToBody(blocks) } : { body: String(n.body || '') };
     })(),
     color: n.color || 'yellow',
+    category: validCategory(n.category),
+    source: String(n.source || ''),
     font: n.font || 'sans',
     size: n.size || 'm',
     ink: n.ink || 'default',

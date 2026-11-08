@@ -1,5 +1,5 @@
 // Subir este número en cada despliegue para forzar la actualización del caché
-const CACHE_NAME = 'cuaderno-v4';
+const CACHE_NAME = 'cuaderno-v5';
 
 const SHELL = [
   './',
@@ -21,6 +21,8 @@ const SHELL = [
   './src/views/agenda.js',
   './src/views/cards.js',
   './src/services/reminders.js',
+  './src/services/images.js',
+  './src/services/inbox.js',
   './src/services/backup.js'
 ];
 
@@ -42,10 +44,62 @@ self.addEventListener('activate', e => {
   );
 });
 
+// ---------- Compartir desde otras apps (Web Share Target) ----------
+// Lo compartido se guarda en una "bandeja" aparte; la app lo recoge al abrirse.
+const INBOX_DB = 'cuaderno-inbox';
+
+function openInbox() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(INBOX_DB, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains('items')) {
+        req.result.createObjectStore('items', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function handleShare(request) {
+  let status = '1';
+  try {
+    const form = await request.formData();
+    const files = form.getAll('media').filter(f => f && typeof f !== 'string' && f.size > 0);
+    const item = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      title: String(form.get('title') || ''),
+      text: String(form.get('text') || ''),
+      url: String(form.get('url') || ''),
+      files,
+      createdAt: Date.now()
+    };
+    const db = await openInbox();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('items', 'readwrite');
+      tx.objectStore('items').put(item);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (err) {
+    console.error('Share target:', err);
+    status = 'error';
+  }
+  return Response.redirect(new URL(`./?share=${status}`, self.registration.scope).href, 303);
+}
+
 // Stale-while-revalidate: responde rápido desde caché y actualiza en segundo plano
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+
+  if (req.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
+    e.respondWith(handleShare(req));
+    return;
+  }
+
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {
     e.respondWith(

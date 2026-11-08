@@ -558,3 +558,141 @@ html, body { overflow-x: hidden; overflow-x: clip; }
 /* Las tarjetas no se ensanchan por una tabla: la tabla se desliza dentro */
 .notes-grid > .note-card, .note-preview { min-width: 0; }
 .note-preview .table-wrap { max-width: 100%; }
+
+/* ---------- Filtros por categoría ---------- */
+.chips {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chip {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip-count { font-size: 0.75rem; opacity: 0.75; }
+
+.cat-badge { white-space: nowrap; }
+
+/* ---------- Enlaces e imágenes en tarjetas ---------- */
+.note-link {
+  color: var(--primary-dark);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  overflow-wrap: anywhere;
+}
+
+.note-img {
+  display: block;
+  width: 100%;
+  max-height: 16rem;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 6px;
+  margin: 0.35rem 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* ---------- Imágenes en el editor ---------- */
+.block-image { position: relative; margin: 0.5rem 0; }
+
+.block-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+
+.img-delete {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ---------- Pantalla de compartir ---------- */
+.share-heading { font-size: 1.1rem; margin: 0; }
+.share-count { font-size: 0.85rem; color: var(--muted); font-weight: normal; }
+
+.share-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+.share-preview img {
+  max-width: 100%;
+  max-height: 14rem;
+  object-fit: contain;
+  border-radius: 6px;
+  align-self: center;
+}
+
+.share-link { font-size: 0.85rem; overflow-wrap: anywhere; }
+.share-link span { color: var(--muted); }
+.share-text { font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+
+.cat-picker { display: flex; gap: 0.5rem; }
+
+.cat-btn {
+  flex: 1;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.6rem 0.25rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.cat-btn.active { border-color: var(--primary); background: #e8f0fe; font-weight: 600; }
+
+.block-image { display: block; width: fit-content; max-width: 100%; }
+.block-image img { cursor: zoom-in; }
+
+/* Visor de imagen a pantalla completa */
+.viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 3000;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  cursor: zoom-out;
+}
+.viewer.hidden { display: none; }
+.viewer img { width: 100%; max-width: 900px; height: auto; }
+.viewer-close {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  font-size: 1.2rem;
+  cursor: pointer;
+}

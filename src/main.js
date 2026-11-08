@@ -8,8 +8,10 @@ import { CHECK_RE, styleClasses } from './views/cards.js';
 import { setupReminders, requestNotificationPermission, notificationsSupported } from './services/reminders.js';
 import { exportData, readBackup } from './services/backup.js';
 import { debounce, escapeHTML, toTimestamp, toInputValues } from './utils.js';
-import { noteBlocks, blocksToBody, blocksEmpty } from './blocks.js';
-import { initEditor, loadBlocks, readBlocks, insertTable, insertList, focusStart, refreshSizes } from './editor.js';
+import { noteBlocks, blocksToBody, blocksEmpty, tidyBlocks, textBlock, imageBlock, CATEGORIES, validCategory } from './blocks.js';
+import { compressImage } from './services/images.js';
+import { getInboxItems, removeInboxItem } from './services/inbox.js';
+import { initEditor, loadBlocks, readBlocks, insertTable, insertImages, insertList, focusStart, refreshSizes } from './editor.js';
 
 // ============ PWA ============
 if ('serviceWorker' in navigator) {
@@ -33,6 +35,7 @@ const state = {
   notes: [],
   events: [],
   query: '',
+  category: 'all',
   editingNote: null,   // copia de la nota abierta (null = nota nueva aún sin guardar)
   draftPinned: false,
   editingEvent: null
@@ -80,7 +83,7 @@ function render() {
   const views = { hoy: $('view-hoy'), notas: $('view-notas'), agenda: $('view-agenda') };
 
   views.hoy.innerHTML = state.query ? renderSearchResults(notes, events) : renderHoy(notes, events);
-  views.notas.innerHTML = renderNotas(notes, state.query);
+  views.notas.innerHTML = renderNotas(notes, state.query, state.category);
   views.agenda.innerHTML = renderAgenda(events, state.query);
 
   Object.entries(views).forEach(([name, el]) => el.classList.toggle('hidden', state.currentView !== name));
@@ -110,6 +113,7 @@ window.addEventListener('popstate', () => {
   modalHistory = false;
   if (!$('note-overlay').classList.contains('hidden')) closeNoteModal({ fromHistory: true });
   if (!$('event-overlay').classList.contains('hidden')) closeEventModal({ fromHistory: true });
+  if (!$('share-overlay').classList.contains('hidden')) postponeShared();
 });
 
 // ============ NOTAS: MODAL CON AUTOGUARDADO ============
@@ -122,6 +126,7 @@ function readNoteForm() {
     blocks,
     body: blocksToBody(blocks),
     color: $('note-color').value,
+    category: $('note-cat').value,
     font: $('note-font').value,
     size: $('note-size').value,
     ink: $('note-ink').value
@@ -130,7 +135,7 @@ function readNoteForm() {
 
 function persistNote() {
   saveChain = saveChain.then(async () => {
-    const { title, blocks, body, color, font, size, ink } = readNoteForm();
+    const { title, blocks, body, color, category, font, size, ink } = readNoteForm();
     const base = state.editingNote;
     if (!base && !title && blocksEmpty(blocks)) return; // nota nueva vacía: no guardar
 
@@ -142,6 +147,7 @@ function persistNote() {
       blocks,
       body,
       color,
+      category,
       font,
       size,
       ink,
@@ -195,6 +201,7 @@ function openNoteModal(note = null) {
   state.draftPinned = !!note?.pinned;
   $('note-title').value = note?.title || '';
   $('note-color').value = note?.color || 'yellow';
+  $('note-cat').value = validCategory(note?.category) || (state.currentView === 'notas' && state.category !== 'all' ? state.category : '');
   $('note-font').value = note?.font || 'sans';
   $('note-size').value = note?.size || 'm';
   $('note-ink').value = note?.ink || 'default';
@@ -246,6 +253,187 @@ async function toggleChecklistLine(noteId, blockIdx, lineIndex) {
   upsert(state.notes, updated);
   state.notes.sort((a, b) => b.updatedAt - a.updatedAt);
   render();
+}
+
+// ============ COMPARTIR DESDE OTRAS APPS ============
+const URL_IN_TEXT = /https?:\/\/[^\s<>"']+/;
+const SOURCES = [
+  [/instagram\.com/, 'Instagram'], [/tiktok\.com/, 'TikTok'], [/(youtube\.com|youtu\.be)/, 'YouTube'],
+  [/(facebook\.com|fb\.watch)/, 'Facebook'], [/(twitter\.com|x\.com)/, 'X'], [/pinterest\./, 'Pinterest'],
+  [/netflix\.com/, 'Netflix'], [/whatsapp\.com/, 'WhatsApp']
+];
+const CAT_COLORS = { receta: 'green', pelicula: 'blue', otro: 'yellow' };
+const share = { queue: [], current: null, category: '', previews: [] };
+
+function sourceName(url) {
+  const hit = SOURCES.find(([re]) => re.test(url));
+  if (hit) return hit[1];
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
+function guessCategory(text) {
+  const t = text.toLowerCase();
+  if (/receta|ingrediente|recipe|cocina|horno|postre|hornear|sopa|cocinar|#food|#comida/.test(t)) return 'receta';
+  if (/pel[ií]cula|movie|film|trailer|tr[aá]iler|netflix|estreno|serie|cine|prime video|disney\+|hbo|max\b/.test(t)) return 'pelicula';
+  return '';
+}
+
+// Ordena lo que mandó la otra app: enlace, texto y título sugerido
+function parseShared(item) {
+  const raw = [item.text, item.url].filter(Boolean).join('\n');
+  const url = item.url || (raw.match(URL_IN_TEXT) || [''])[0];
+  let text = (item.text || '').trim();
+  if (url) text = text.split(url).join('').trim();
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  let title = (item.title || '').trim();
+  if (!title && text) title = text.split('\n')[0].replace(/[#@]\S+/g, '').trim().slice(0, 70);
+  if (!title && url) title = `Enlace de ${sourceName(url)}`;
+  if (!title && item.files?.length) title = item.files.length > 1 ? `${item.files.length} capturas` : 'Captura';
+
+  return { url, text, title, category: guessCategory(`${item.title} ${raw}`) };
+}
+
+function setShareCategory(cat) {
+  share.category = cat;
+  document.querySelectorAll('[data-share-cat]').forEach(b => {
+    const on = b.dataset.shareCat === cat;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+}
+
+function clearPreviews() {
+  share.previews.forEach(u => URL.revokeObjectURL(u));
+  share.previews = [];
+}
+
+function showNextShare() {
+  clearPreviews();
+  share.current = share.queue.shift() || null;
+  if (!share.current) {
+    $('share-overlay').classList.add('hidden');
+    return;
+  }
+  const item = share.current;
+  const info = parseShared(item);
+  share.current.info = info;
+
+  const pending = share.queue.length;
+  $('share-count').textContent = pending ? `(quedan ${pending + 1})` : '';
+  $('share-title').value = info.title;
+  $('share-comment').value = '';
+  setShareCategory(info.category);
+
+  const parts = [];
+  (item.files || []).forEach(f => {
+    const u = URL.createObjectURL(f);
+    share.previews.push(u);
+    parts.push(`<img src="${u}" alt="Imagen compartida">`);
+  });
+  if (info.url) parts.push(`<div class="share-link">🔗 ${escapeHTML(sourceName(info.url))} · <span>${escapeHTML(info.url)}</span></div>`);
+  if (info.text) parts.push(`<div class="share-text">${escapeHTML(info.text.slice(0, 300))}${info.text.length > 300 ? '…' : ''}</div>`);
+  if (!parts.length) parts.push('<div class="share-text">No llegó contenido. Puedes escribir un comentario igual.</div>');
+  $('share-preview').innerHTML = parts.join('');
+
+  closeMenu();
+  $('share-overlay').classList.remove('hidden');
+}
+
+async function saveShared() {
+  const item = share.current;
+  if (!item) return;
+  const btn = $('share-save');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const { url, text } = item.info;
+    const category = share.category || 'otro';
+    const comment = $('share-comment').value.trim();
+
+    const images = [];
+    for (const f of item.files || []) {
+      try { images.push(await compressImage(f)); } catch (err) { console.warn('Imagen omitida:', err); }
+    }
+
+    const textPart = [comment, text, url].filter(Boolean).join('\n\n');
+    const blocks = tidyBlocks([textBlock(textPart), ...images.map(imageBlock)]);
+    const now = Date.now();
+    const note = {
+      id: uuid(),
+      title: $('share-title').value.trim() || item.info.title || 'Guardado',
+      blocks,
+      body: blocksToBody(blocks),
+      color: CAT_COLORS[category],
+      font: 'sans', size: 'm', ink: 'default',
+      category,
+      source: url ? sourceName(url) : (images.length ? 'Captura' : ''),
+      pinned: false,
+      tags: [],
+      createdAt: now,
+      updatedAt: now
+    };
+    await saveNote(note);
+    await removeInboxItem(item.id);
+    upsert(state.notes, note);
+    state.notes.sort((a, b) => b.updatedAt - a.updatedAt);
+    state.currentView = 'notas';
+    state.category = category;
+    render();
+    toast(`Guardado en ${CATEGORIES[category].icon} ${CATEGORIES[category].plural}`);
+    showNextShare();
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo guardar. Intenta de nuevo.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
+  }
+}
+
+async function discardShared() {
+  if (share.current) await removeInboxItem(share.current.id).catch(() => {});
+  showNextShare();
+}
+
+// ✕ o atrás: queda pendiente para la próxima vez
+function postponeShared() {
+  if (!share.current) return;
+  share.queue = [];
+  share.current = null;
+  clearPreviews();
+  $('share-overlay').classList.add('hidden');
+  toast('Quedó pendiente: aparecerá la próxima vez que abras Cuaderno', 3500);
+}
+
+async function checkInbox() {
+  const params = new URLSearchParams(location.search);
+  if (params.has('share')) {
+    history.replaceState(null, '', location.pathname);
+    if (params.get('share') === 'error') toast('No se pudo recibir lo compartido', 4000);
+  }
+  try {
+    const items = await getInboxItems();
+    if (items.length && !share.current) {
+      share.queue = items;
+      showNextShare();
+    }
+  } catch (err) {
+    console.warn('Bandeja:', err);
+  }
+}
+
+// ============ IMÁGENES DESDE EL EDITOR ============
+async function addImagesFromFiles(files) {
+  const list = [...files].filter(f => f.type.startsWith('image/'));
+  if (!list.length) return;
+  $('note-status').textContent = 'Procesando imagen…';
+  const srcs = [];
+  for (const f of list) {
+    try { srcs.push(await compressImage(f)); } catch (err) { console.warn(err); }
+  }
+  if (srcs.length) insertImages(srcs);
+  else $('note-status').textContent = '⚠️ No se pudo leer la imagen';
 }
 
 // ============ EVENTOS: FORMULARIO ============
@@ -456,6 +644,15 @@ function setupEventListeners() {
   container.addEventListener('click', async e => {
     // Las casillas se manejan en 'change'; no abrir la nota al marcarlas
     if (e.target.closest('.check-line')) return;
+    // Un enlace se abre en su app; no abre la nota
+    if (e.target.closest('a.note-link')) return;
+
+    const chip = e.target.closest('[data-cat]');
+    if (chip) {
+      state.category = chip.dataset.cat;
+      render();
+      return;
+    }
 
     const delBtn = e.target.closest('[data-delete-note]');
     if (delBtn) {
@@ -491,7 +688,21 @@ function setupEventListeners() {
     onNoteInput();
   });
   // Barra del editor (mousedown evita que el teclado del teléfono se cierre)
-  ['tb-list', 'tb-table', 'tb-style', 'tbl-insert'].forEach(id =>
+  $('note-cat').addEventListener('change', onNoteInput);
+  $('tb-image').addEventListener('click', () => $('img-file').click());
+  $('img-file').addEventListener('change', e => {
+    addImagesFromFiles(e.target.files);
+    e.target.value = '';
+  });
+  // Pegar una imagen (teclado o portapapeles)
+  $('note-blocks').addEventListener('paste', e => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (files.some(f => f.type.startsWith('image/'))) {
+      e.preventDefault();
+      addImagesFromFiles(files);
+    }
+  });
+  ['tb-list', 'tb-table', 'tb-style', 'tb-image', 'tbl-insert'].forEach(id =>
     $(id).addEventListener('mousedown', e => e.preventDefault()));
   $('tb-list').addEventListener('click', insertList);
   $('tb-table').addEventListener('click', () => {
@@ -533,6 +744,30 @@ function setupEventListeners() {
     if (e.target.id === 'note-overlay') closeNoteModal();
   });
 
+  // Ver imagen en grande (tocar la imagen dentro de la nota)
+  $('note-blocks').addEventListener('click', e => {
+    const img = e.target.closest('.block-image img');
+    if (!img) return;
+    $('viewer-img').src = img.src;
+    $('viewer').classList.remove('hidden');
+  });
+  $('viewer').addEventListener('click', () => {
+    $('viewer').classList.add('hidden');
+    $('viewer-img').removeAttribute('src');
+  });
+
+  // Pantalla de compartir
+  document.querySelectorAll('[data-share-cat]').forEach(b =>
+    b.addEventListener('click', () => setShareCategory(b.dataset.shareCat)));
+  $('share-save').addEventListener('click', saveShared);
+  $('share-discard').addEventListener('click', discardShared);
+  $('share-close').addEventListener('click', postponeShared);
+
+  // Al volver a la app, revisar si llegó algo compartido
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkInbox();
+  });
+
   // Modal de evento
   $('event-form').addEventListener('submit', submitEvent);
   $('event-close').addEventListener('click', () => closeEventModal());
@@ -552,7 +787,9 @@ function setupEventListeners() {
   // Atajos de teclado
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
+      if (!$('viewer').classList.contains('hidden')) return void $('viewer').click();
       closeMenu();
+      if (!$('share-overlay').classList.contains('hidden')) postponeShared();
       closeNoteModal();
       closeEventModal();
       return;
@@ -580,6 +817,7 @@ async function init() {
 
   setupEventListeners();
   render();
+  checkInbox();
 
   checkReminders = setupReminders({
     getEvents: () => state.events,

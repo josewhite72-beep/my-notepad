@@ -55,8 +55,10 @@
       <div class="editor-toolbar">
         <button type="button" id="tb-list" class="tool-btn" title="Insertar lista de tareas">☑ Lista</button>
         <button type="button" id="tb-table" class="tool-btn" title="Insertar tabla" aria-expanded="false">▦ Tabla</button>
+        <button type="button" id="tb-image" class="tool-btn" title="Agregar imagen o captura">🖼 Imagen</button>
         <button type="button" id="tb-style" class="tool-btn" aria-expanded="false" title="Estilo de la nota">Aa Estilo</button>
       </div>
+      <input type="file" id="img-file" accept="image/*" multiple hidden>
       <div id="style-panel" class="style-panel hidden">
         <label>Letra
           <select id="note-font">
@@ -109,6 +111,12 @@
           <option value="pink">Rosa</option>
           <option value="white">Blanco</option>
         </select>
+        <select id="note-cat" class="color-select" aria-label="Categoría">
+          <option value="">Sin categoría</option>
+          <option value="receta">🍲 Receta</option>
+          <option value="pelicula">🎬 Película</option>
+          <option value="otro">📌 Otro</option>
+        </select>
         <button id="note-pin" class="btn-secondary" aria-pressed="false">📌 Fijar</button>
         <button id="note-delete" class="btn-danger">Eliminar</button>
         <span id="note-status" class="save-status"></span>
@@ -150,6 +158,39 @@
         <button type="submit" class="btn-primary">Guardar</button>
       </div>
     </form>
+  </div>
+
+  <!-- Guardar lo compartido desde otra app -->
+  <div id="share-overlay" class="modal-overlay hidden">
+    <div class="modal share-modal">
+      <div class="modal-header">
+        <h2 class="share-heading">Guardar en Cuaderno <span id="share-count" class="share-count"></span></h2>
+        <button type="button" id="share-close" class="btn-icon" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="form-body">
+        <div id="share-preview" class="share-preview"></div>
+        <div class="cat-picker" role="radiogroup" aria-label="Categoría">
+          <button type="button" class="cat-btn" role="radio" data-share-cat="receta">🍲 Receta</button>
+          <button type="button" class="cat-btn" role="radio" data-share-cat="pelicula">🎬 Película</button>
+          <button type="button" class="cat-btn" role="radio" data-share-cat="otro">📌 Otro</button>
+        </div>
+        <label>Título
+          <input type="text" id="share-title" placeholder="¿Qué es?">
+        </label>
+        <label>Comentario (opcional)
+          <textarea id="share-comment" rows="3" placeholder="Ej.: pollo al curry, para el domingo"></textarea>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="share-discard" class="btn-danger">Descartar</button>
+        <button type="button" id="share-save" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="viewer" class="viewer hidden" role="dialog" aria-label="Imagen">
+    <img id="viewer-img" alt="Imagen ampliada">
+    <button type="button" class="viewer-close" aria-label="Cerrar">✕</button>
   </div>
 
   <div id="toast" class="toast hidden" role="status"></div>

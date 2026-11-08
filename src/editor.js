@@ -1,5 +1,5 @@
 // Editor de nota por bloques: cuadros de texto y tablas con celdas editables
-import { textBlock, tableBlock, tidyBlocks } from './blocks.js';
+import { textBlock, tableBlock, imageBlock, tidyBlocks } from './blocks.js';
 import { CHECK_RE } from './views/cards.js';
 
 let root = null;        // contenedor #note-blocks
@@ -29,6 +29,12 @@ export function initEditor(container, changeHandler) {
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-tbl-action]');
     if (btn) tableAction(btn.closest('.block-table'), btn.dataset.tblAction);
+    const del = e.target.closest('[data-img-delete]');
+    if (del && confirm('¿Quitar esta imagen de la nota?')) {
+      del.closest('.block-image').remove();
+      loadBlocks(tidyBlocks(readBlocks()));
+      onChange();
+    }
   });
 
   // Que los botones de la tabla no cierren el teclado
@@ -93,13 +99,32 @@ function makeTable(block) {
   return wrap;
 }
 
+function makeImage(block) {
+  const wrap = document.createElement('div');
+  wrap.className = 'block-image';
+  wrap.dataset.block = block.id;
+  const img = document.createElement('img');
+  img.src = block.src;
+  img.alt = 'Imagen guardada';
+  img.loading = 'lazy';
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'img-delete';
+  del.dataset.imgDelete = '1';
+  del.setAttribute('aria-label', 'Quitar imagen');
+  del.textContent = '✕';
+  wrap.append(img, del);
+  return wrap;
+}
+
 export function autoGrow(ta) {
   ta.style.height = 'auto';
   ta.style.height = ta.scrollHeight + 'px';
 }
 
 export function loadBlocks(blocks) {
-  root.replaceChildren(...blocks.map(b => b.type === 'text' ? makeText(b) : makeTable(b)));
+  root.replaceChildren(...blocks.map(b =>
+    b.type === 'text' ? makeText(b) : b.type === 'image' ? makeImage(b) : makeTable(b)));
   lastText = root.querySelector('.block-text');
   lastCell = null;
   requestAnimationFrame(() => root.querySelectorAll('.block-text').forEach(autoGrow));
@@ -109,6 +134,9 @@ export function readBlocks() {
   return [...root.children].map(el => {
     if (el.matches('.block-text')) {
       return { id: el.dataset.block, type: 'text', text: el.value.replace(/\s+$/, '') };
+    }
+    if (el.matches('.block-image')) {
+      return { id: el.dataset.block, type: 'image', src: el.querySelector('img').src };
     }
     const rows = [...el.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('.cell')].map(c => c.value));
     return { id: el.dataset.block, type: 'table', rows };
@@ -124,14 +152,13 @@ export function refreshSizes() {
   root.querySelectorAll('.block-text').forEach(autoGrow);
 }
 
-// ---------- Insertar tabla en la posición del cursor ----------
-export function insertTable(rows, cols) {
+// ---------- Insertar tabla o imagen en la posición del cursor ----------
+function insertBlocksAtCursor(newBlocks) {
   const blocks = readBlocks();
-  const table = tableBlock(rows, cols);
-  let target = lastText && root.contains(lastText) ? lastText : null;
+  const target = lastText && root.contains(lastText) ? lastText : null;
 
   if (!target) {
-    blocks.push(table);
+    blocks.push(...newBlocks);
   } else {
     const i = blocks.findIndex(b => b.id === target.dataset.block);
     const value = target.value;
@@ -141,16 +168,28 @@ export function insertTable(rows, cols) {
     const cut = nl === -1 ? value.length : nl;
     const before = value.slice(0, cut);
     const after = value.slice(cut).replace(/^\n/, '');
-    blocks.splice(i, 1, textBlock(before), table, textBlock(after));
+    blocks.splice(i, 1, textBlock(before), ...newBlocks, textBlock(after));
   }
-
   loadBlocks(tidyBlocks(blocks));
+  onChange();
+}
+
+export function insertTable(rows, cols) {
+  const table = tableBlock(rows, cols);
+  insertBlocksAtCursor([table]);
   const firstCell = root.querySelector(`.block-table[data-block="${table.id}"] .cell`);
   if (firstCell) {
     firstCell.focus();
     firstCell.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
-  onChange();
+}
+
+export function insertImages(srcs) {
+  if (!srcs.length) return;
+  const imgs = srcs.map(imageBlock);
+  insertBlocksAtCursor(imgs);
+  const el = root.querySelector(`.block-image[data-block="${imgs[imgs.length - 1].id}"]`);
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // ---------- Acciones de tabla ----------
