@@ -2,12 +2,12 @@ import { renderNoteCard } from './cards.js';
 import { escapeHTML } from '../utils.js';
 import { CATEGORIES } from '../blocks.js';
 
-function chips(active, counts) {
-  const all = `<button class="chip${active === 'all' ? ' active' : ''}" data-cat="all">Todo</button>`;
-  const rest = Object.entries(CATEGORIES).map(([key, c]) =>
-    `<button class="chip${active === key ? ' active' : ''}" data-cat="${key}">${c.icon} ${c.plural}${counts[key] ? ` <span class="chip-count">${counts[key]}</span>` : ''}</button>`
-  ).join('');
-  return `<div class="chips" role="toolbar" aria-label="Filtrar por categoría">${all}${rest}</div>`;
+function chips(active, counts, total) {
+  const chip = (key, icon, label, n) =>
+    `<button class="chip${active === key ? ' active' : ''}" data-cat="${key}" aria-pressed="${active === key}">` +
+    `<span class="chip-icon">${icon}</span><span class="chip-label">${label}${n ? ` <span class="chip-count">${n}</span>` : ''}</span></button>`;
+  const rest = Object.entries(CATEGORIES).map(([key, c]) => chip(key, c.icon, c.plural, counts[key])).join('');
+  return `<div class="chips" role="toolbar" aria-label="Filtrar por categoría">${chip('all', '🗂️', 'Todo', total)}${rest}</div>`;
 }
 
 // notes: ya filtradas por búsqueda; category: 'all' o clave de CATEGORIES
@@ -16,7 +16,7 @@ export function renderNotas(notes, query = '', category = null) {
   const counts = {};
   notes.forEach(n => { if (n.category) counts[n.category] = (counts[n.category] || 0) + 1; });
   const list = showChips && category !== 'all' ? notes.filter(n => n.category === category) : notes;
-  const bar = showChips ? chips(category, counts) : '';
+  const bar = showChips ? chips(category, counts, notes.length) : '';
 
   if (list.length === 0) {
     let msg = 'No hay notas todavía';

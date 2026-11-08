@@ -1,5 +1,5 @@
 // Subir este número en cada despliegue para forzar la actualización del caché
-const CACHE_NAME = 'cuaderno-v5';
+const CACHE_NAME = 'cuaderno-v6';
 
 const SHELL = [
   './',
